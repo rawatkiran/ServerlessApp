@@ -1,0 +1,210 @@
+import React, { Component } from "react";
+import {
+  Platform,
+  StyleSheet,
+  Dimensions,
+  Text,
+  TextInput,
+  View,
+  Fragment,
+  TouchableOpacity,
+  AsyncStorage,
+  ActivityIndicator
+} from "react-native";
+import { get } from "lodash";
+import Item from "../components/Item";
+import { createItem } from "../graphql/mutations";
+import { listItems, getItem } from "../graphql/queries";
+import { graphql, compose } from "react-apollo";
+import graphqlMutation from "aws-appsync";
+import { client } from "../../App";
+import { Query } from "react-apollo";
+
+const deviceWidth = Dimensions.get("window").width;
+const deviceHeight = Dimensions.get("window").height;
+
+class Home extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      item: "",
+      savedItem: "",
+      savedId: "",
+      itemName: ""
+    };
+  }
+  addItem() {
+    this.props
+      .mutate({
+        variables: {
+          name: this.state.item,
+          status: true
+        }
+      })
+      .then(success => {
+        console.log("success", success.data.createItem.id);
+        this.setState({ item: "" });
+
+        //this.getItems();
+        //this.saveData(success.data.createItem.id);
+      })
+      .catch(err => {
+        console.log("error inside mutate", err);
+      });
+  }
+  getItems() {
+    client
+      .query({
+        query: listItems
+      })
+      .then(data => {
+        console.log("ITEMS", data.data.listItems.items);
+        if (data) {
+          const infoToRender = data.data.listItems.items;
+          console.log(infoToRender, "Dataaaaa");
+          return (
+            <View style={{ padding: 20 }}>
+              {infoToRender.map((info, index) => (
+                <Item key={index} name={info.name} />
+              ))}
+            </View>
+          );
+        }
+      });
+  }
+  // showItem() {
+  //   console.log(this.state.savedId, "SSSS");
+  //   client
+  //     .query({
+  //       query: getItem,
+  //       variables: {
+  //         savedId: this.state.savedId
+  //       }
+  //     })
+  //     .then(data => {
+  //       console.log("ITEMS", data);
+  //       this.setState({ itemName: data.data.getItem.name });
+  //       if (data) {
+  //         return (
+  //           <View>
+  //             <Text style={{ fontSize: 28 }}>hi</Text>
+  //           </View>
+  //         );
+  //       }
+  //     });
+  // }
+  // saveData(value) {
+  //   AsyncStorage.setItem("savedId", value);
+  //   this.setState({ savedId: value });
+  //   this.showItem();
+  // }
+  // componentWillMount() {
+  //   client
+  //     .query({
+  //       query: listItems
+  //     })
+  //     .then(data => {
+  //       console.log("ITEMS", data.data.listItems.items);
+  //       let infoToRender = data.data.listItems.items;
+  //       console.log(infoToRender, "RENDERINFO");
+  //     })
+
+  //     .catch(error => console.error(error, "ERROR"));
+  // }
+  render() {
+    console.log(this.state.savedId, "SID");
+    return (
+      <View style={{ flex: 1, borderWidth: 2 }}>
+        <View style={{ marginTop: 30 }}>
+          <Text style={{ textAlign: "center", padding: 10, fontSize: 50 }}>
+            todos
+          </Text>
+        </View>
+        <View
+          style={{
+            marginTop: 10,
+            // borderWidth: 2,
+            // borderColor: "red",
+            alignItems: "center",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            padding: 10
+          }}
+        >
+          <TextInput
+            style={{
+              width: deviceWidth / 1.5,
+              height: deviceHeight / 14,
+              justifyContent: "center",
+              alignItems: "center",
+              borderWidth: 2,
+              fontSize: 22,
+              paddingLeft: 20
+            }}
+            placeholder="What needs to be done?"
+            placeholderTextColor="orange"
+            autoCapitalize="none"
+            onChangeText={item =>
+              this.setState({
+                item
+              })
+            }
+            value={this.state.item}
+          />
+          <TouchableOpacity
+            style={{
+              width: deviceWidth / 4,
+              height: deviceHeight / 14,
+              borderWidth: 2,
+              justifyContent: "center",
+              alignItems: "center"
+            }}
+            onPress={() => {
+              this.addItem();
+
+              console.log(this.state.item);
+            }}
+          >
+            <Text style={{ fontSize: 20 }}>Add</Text>
+          </TouchableOpacity>
+        </View>
+        <EnhancedItemList />
+      </View>
+    );
+  }
+}
+export default graphql(createItem)(Home);
+
+class ItemList extends Component {
+  render() {
+    console.log(this.props, "props");
+    let itemData = [];
+    if (this.props) {
+      itemData = get(this.props, "ItemSearch.listItems.items", []);
+      console.log(itemData, "FIRST");
+    }
+    return (
+      <View style={{ padding: 20 }}>
+        {itemData.map((item, index) => {
+          return (
+            <View>
+              <Text key={index}>{item.name}</Text>
+            </View>
+          );
+        })}
+      </View>
+    );
+  }
+}
+const EnhancedItemList = compose(
+  graphql(listItems, {
+    name: "ItemSearch",
+    options: () => ({
+      fetchPolicy: "network-only"
+    }),
+    props:props =>({
+      todos:props.data.listItems?props.data.listItems.items:[]
+    })
+    //skip: ({ searchString }) => searchString === ""
+  })
+)(ItemList);
